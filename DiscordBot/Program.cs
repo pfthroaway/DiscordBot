@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SQLite;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -19,6 +20,8 @@ namespace DiscordBot
         private List<Command> AllCommands = new List<Command>();
         private List<DiscordUser> AllUsers = new List<DiscordUser>();
         private string _botToken = "";
+        private string[] briahna;
+        private string[] briahnansfw;
 
         #region Random Number Generation
 
@@ -95,6 +98,8 @@ namespace DiscordBot
                             DiscordUser newUser = new DiscordUser(
                                 name: ds.Tables[0].Rows[i]["Name"].ToString(),
                                 description: ds.Tables[0].Rows[i]["Description"].ToString(),
+                                github: ds.Tables[0].Rows[i]["GitHub"].ToString(),
+                                project: ds.Tables[0].Rows[i]["Project"].ToString(),
                                 nicknames: nicknames);
                             AllUsers.Add(newUser);
                         }
@@ -117,7 +122,10 @@ namespace DiscordBot
                             AllCommands.Add(newCommand);
                         }
                     }
-                    AllCommands = AllCommands.OrderBy(command => command.Name).ToList();
+                    AllCommands = AllCommands.OrderBy(command => command.Name.ToString()).ToList();
+
+                    briahna = Directory.GetFiles("Images", "*.*");
+                    briahnansfw = Directory.GetFiles("Images\\NSFW", "*.*");
                     success = true;
                 }
                 catch (Exception ex)
@@ -206,6 +214,9 @@ namespace DiscordBot
 
         #endregion Dice Game
 
+        /// <summary>Returns a List of users matching that nickname.</summary>
+        /// <param name="username">Name to be matched</param>
+        /// <returns>Returns a List of matching users</returns>
         private List<DiscordUser> GetMatchingUsers(string username)
         {
             if (username.Contains("@"))
@@ -221,8 +232,39 @@ namespace DiscordBot
             return output;
         }
 
-        private void LoadCommands()
+        private async Task<bool> SetProject(User user, string project)
         {
+            bool success = false;
+
+            List<DiscordUser> matchingUsers = GetMatchingUsers(user.Name.ToLower());
+
+            if (matchingUsers.Count > 0)
+            {
+                matchingUsers[0].Project = project;
+                SQLiteCommand cmd = new SQLiteCommand();
+                SQLiteConnection con = new SQLiteConnection();
+                con.ConnectionString = _DBPROVIDERANDSOURCE;
+                cmd.CommandText = "UPDATE Users SET [Project] = @project WHERE [Name] = @name";
+                cmd.Parameters.AddWithValue("@project", project);
+                cmd.Parameters.AddWithValue("@name", user.ToString());
+                await Task.Factory.StartNew(() =>
+              {
+                  try
+                  {
+                      cmd.Connection = con;
+                      con.Open();
+                      cmd.ExecuteNonQuery();
+                      success = true;
+                  }
+                  catch (Exception ex)
+                  {
+                      Console.WriteLine(ex.Message);
+                  }
+                  finally { con.Close(); }
+              });
+            }
+
+            return success;
         }
 
         public async Task Start()
@@ -236,16 +278,19 @@ namespace DiscordBot
                 {
                     if (e.Message.Text.Trim().ToLower().StartsWith("!bot"))
                     {
-                        string message = e.Message.Text.Substring(e.Message.Text.IndexOf("!bot") + 4).Trim().ToLower();
+                        string message = e.Message.Text.Substring(e.Message.Text.IndexOf("!bot") + 4).Trim();
                         string command = "";
                         string parameters = "";
                         if (message.Contains(" "))
                         {
                             command = message.Substring(0, message.IndexOf(" ")).ToLower();
-                            parameters = message.Substring(message.IndexOf(" ") + 1).ToLower();
+                            if (!command.Contains("setproj"))
+                                parameters = message.Substring(message.IndexOf(" ") + 1).ToLower();
+                            else
+                                parameters = message.Substring(message.IndexOf(" ") + 1);
                         }
                         else
-                            command = message;
+                            command = message.ToLower();
 
                         Commands currentCommand;
                         if (Enum.TryParse(command, out currentCommand))
@@ -260,6 +305,7 @@ namespace DiscordBot
                                     await e.Channel.SendMessage(Help());
                                     break;
 
+                                case Commands.dox:
                                 case Commands.whois:
                                     if (parameters.Length > 0)
                                     {
@@ -288,13 +334,19 @@ namespace DiscordBot
                                     if (parameters.Length > 0)
                                     {
                                         bool success = false;
-                                        foreach (User user in e.Channel.Users)
+
+                                        List<DiscordUser> pingUsers = GetMatchingUsers(parameters);
+                                        if (pingUsers.Count > 0)
                                         {
-                                            if (parameters == user.Name.ToLower())
+                                            string pingUsername = pingUsers[0].Name.Substring(0, pingUsers[0].Name.IndexOf("#"));
+                                            foreach (User user in e.Channel.Users)
                                             {
-                                                await e.Channel.SendMessage(user.NicknameMention);
-                                                success = true;
-                                                break;
+                                                if (pingUsername.ToLower() == user.Name.ToLower())
+                                                {
+                                                    await e.Channel.SendMessage(user.NicknameMention);
+                                                    success = true;
+                                                    break;
+                                                }
                                             }
                                         }
 
@@ -305,13 +357,75 @@ namespace DiscordBot
                                         await e.Channel.SendMessage("Please name someone I should ping.");
                                     break;
 
+                                case Commands.time:
+                                    await e.Channel.SendMessage("The date and time in UTC is: " + DateTime.UtcNow.ToString("dddd, yyyy/MM/dd hh:mm:ss tt") + nl + nl + "My creator's local time is: " + DateTime.Now.ToString("dddd, yyyy/MM/dd hh:mm:ss tt"));
+                                    break;
+
+                                case Commands.whoami:
+                                    List<DiscordUser> whoAmIUsers = GetMatchingUsers(e.Message.User.Name.ToLower());
+                                    if (whoAmIUsers.Count > 0)
+                                        await e.Channel.SendMessage(whoAmIUsers[0].Description);
+                                    else
+                                        await e.Channel.SendMessage("I don't know you.");
+                                    break;
+
                                 default:
-                                    await e.Channel.SendMessage("Invalid command.");
+                                    await e.Channel.SendMessage("Invalid command. Please type \"!bot help\" for a list of valid commands.");
+                                    break;
+
+                                case Commands.git:
+                                case Commands.github:
+                                    if (parameters.Length > 0)
+                                    {
+                                        List<DiscordUser> whoIsUsers = GetMatchingUsers(parameters);
+                                        if (whoIsUsers.Count > 0)
+                                        {
+                                            string githubUsername = whoIsUsers[0].Name.Substring(0, whoIsUsers[0].Name.IndexOf("#"));
+                                            await e.Channel.SendMessage(githubUsername + "'s GitHub link is: " + whoIsUsers[0].GitHub);
+                                        }
+                                        else
+                                            await e.Channel.SendMessage("I don't know that user.");
+                                    }
+                                    else
+                                        await e.Channel.SendMessage("Please name someone whose GitHub I should link.");
+                                    break;
+
+                                case Commands.proj:
+                                case Commands.project:
+                                    if (parameters.Length > 0)
+                                    {
+                                        List<DiscordUser> whoIsUsers = GetMatchingUsers(parameters);
+                                        if (whoIsUsers.Count > 0)
+                                        {
+                                            string projUsername = whoIsUsers[0].Name.Substring(0, whoIsUsers[0].Name.IndexOf("#"));
+                                            await e.Channel.SendMessage(projUsername + "'s current project is: " + whoIsUsers[0].Project);
+                                        }
+                                        else
+                                            await e.Channel.SendMessage("I don't know that user.");
+                                    }
+                                    else
+                                        await e.Channel.SendMessage("Please name someone whose current project I should tell you.");
+                                    break;
+
+                                case Commands.briahna:
+                                    await e.Channel.SendFile(briahna[GenerateRandomNumber(0, briahna.Count())]);
+                                    break;
+
+                                case Commands.briahnansfw:
+                                    await e.Channel.SendFile(briahnansfw[GenerateRandomNumber(0, briahnansfw.Count())]);
+                                    break;
+
+                                case Commands.setproj:
+                                case Commands.setproject:
+                                    if (await SetProject(e.Message.User, parameters))
+                                        await e.Channel.SendMessage("Project set successful.");
+                                    else
+                                        await e.Channel.SendMessage("Failure! Project set not successful.");
                                     break;
                             }
                         }
                         else
-                            await e.Channel.SendMessage("Invalid command.");
+                            await e.Channel.SendMessage("Invalid command. Please type \"!bot help\" for a list of valid commands.");
                     }
                 };
 

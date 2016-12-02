@@ -6,7 +6,7 @@ namespace DiscordBot
     /// <summary>Represents a user on Discord.</summary>
     internal class DiscordUser
     {
-        private string _name, _description;
+        private string _name, _description, _github, _project;
         private List<string> _nicknames = new List<string>();
 
         #region Properties
@@ -32,6 +32,18 @@ namespace DiscordBot
             set { _nicknames = value; }
         }
 
+        public string GitHub
+        {
+            get { return _github; }
+            set { _github = value; }
+        }
+
+        public string Project
+        {
+            get { return _project; }
+            set { _project = value; }
+        }
+
         #endregion Properties
 
         #region Constructors
@@ -45,10 +57,12 @@ namespace DiscordBot
         /// <param name="name">Name of DiscordUser</param>
         /// <param name="description">Description of DiscordUser</param>
         /// <param name="nicknames">Nicknames used by DiscordUser</param>
-        public DiscordUser(string name, string description, List<String> nicknames)
+        public DiscordUser(string name, string description, string github, string project, List<String> nicknames)
         {
             Name = name;
             Description = description;
+            GitHub = github;
+            Project = project;
             Nicknames = nicknames;
         }
 
@@ -58,6 +72,8 @@ namespace DiscordBot
         {
             Name = otherUser.Name;
             Description = otherUser.Description;
+            GitHub = otherUser.GitHub;
+            Project = otherUser.Project;
             Nicknames = otherUser.Nicknames;
         }
 
