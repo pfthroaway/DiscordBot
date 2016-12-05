@@ -209,7 +209,7 @@ namespace DiscordBot
             else
                 output = ": " + string.Join(", ", values);
 
-            return output += nl + nl + "Total Value: " + values.Sum();
+            return output += nl + nl + "Total Value: " + values.Sum().ToString("N0");
         }
 
         #endregion Dice Game
@@ -267,6 +267,240 @@ namespace DiscordBot
             return success;
         }
 
+        private async Task<bool> SetGitHub(User user, string github)
+        {
+            bool success = false;
+
+            List<DiscordUser> matchingUsers = GetMatchingUsers(user.Name.ToLower());
+
+            if (matchingUsers.Count > 0)
+            {
+                matchingUsers[0].GitHub = github;
+                SQLiteCommand cmd = new SQLiteCommand();
+                SQLiteConnection con = new SQLiteConnection();
+                con.ConnectionString = _DBPROVIDERANDSOURCE;
+                cmd.CommandText = "UPDATE Users SET [GitHub] = @github WHERE [Name] = @name";
+                cmd.Parameters.AddWithValue("@github", github);
+                cmd.Parameters.AddWithValue("@name", user.ToString());
+                await Task.Factory.StartNew(() =>
+                {
+                    try
+                    {
+                        cmd.Connection = con;
+                        con.Open();
+                        cmd.ExecuteNonQuery();
+                        success = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex.Message);
+                    }
+                    finally { con.Close(); }
+                });
+            }
+
+            return success;
+        }
+
+        private async Task<bool> IssueCommand(MessageEventArgs e, Commands selectedCommand, string parameters)
+        {
+            bool me = parameters == "me";
+
+            switch (selectedCommand)
+            {
+                case Commands.roll:
+                    await e.Channel.SendMessage(DiceGame(e.Message.User.Name, parameters));
+                    break;
+
+                case Commands.help:
+                    await e.Channel.SendMessage(Help());
+                    break;
+
+                case Commands.dox:
+                case Commands.whois:
+                    if (parameters.Length > 0)
+                    {
+                        List<DiscordUser> whoIsUsers;
+                        if (!me)
+                            whoIsUsers = GetMatchingUsers(parameters);
+                        else
+                            whoIsUsers = GetMatchingUsers(e.Message.User.Name.ToLower());
+
+                        if (whoIsUsers.Count > 0)
+                            await e.Channel.SendMessage(whoIsUsers[0].Description);
+                        else
+                            await e.Channel.SendMessage("I don't know that user.");
+                    }
+                    else
+                        await e.Channel.SendMessage("Please name someone I should dox.");
+                    break;
+
+                case Commands.whoareyou:
+                    await e.Channel.SendMessage("I'm a bot; bleep, bloop. I was created by the real PFthroaway.");
+                    break;
+
+                case Commands.shutdown:
+                    if (e.Message.User.Name.ToLower() == "pfthroaway")
+                        await _client.Disconnect();
+                    else
+                        await e.Channel.SendMessage("You're not the boss of me!");
+                    break;
+
+                case Commands.mention:
+                case Commands.ping:
+                    if (parameters.Length > 0)
+                    {
+                        bool success = false;
+
+                        if (!me)
+                        {
+                            List<DiscordUser> pingUsers = GetMatchingUsers(parameters);
+                            if (pingUsers.Count > 0)
+                            {
+                                string pingUsername = pingUsers[0].Name.Substring(0, pingUsers[0].Name.IndexOf("#"));
+                                foreach (User user in e.Channel.Users)
+                                {
+                                    if (pingUsername.ToLower() == user.Name.ToLower())
+                                    {
+                                        await e.Channel.SendMessage(user.NicknameMention);
+                                        success = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            await e.Channel.SendMessage(e.Message.User.NicknameMention);
+                            success = true;
+                        }
+
+                        if (!success)
+                            await e.Channel.SendMessage("I don't know that user.");
+                    }
+                    else
+                        await e.Channel.SendMessage("Please name someone I should ping.");
+                    break;
+
+                case Commands.time:
+                    await e.Channel.SendMessage("The date and time in UTC is: " + DateTime.UtcNow.ToString("dddd, yyyy/MM/dd hh:mm:ss tt") + nl + nl + "My creator's local time is: " + DateTime.Now.ToString("dddd, yyyy/MM/dd hh:mm:ss tt"));
+                    break;
+
+                case Commands.whoami:
+                    List<DiscordUser> whoAmIUsers = GetMatchingUsers(e.Message.User.Name.ToLower());
+                    if (whoAmIUsers.Count > 0)
+                        await e.Channel.SendMessage(whoAmIUsers[0].Description);
+                    else
+                        await e.Channel.SendMessage("I don't know you.");
+                    break;
+
+                default:
+                    await e.Channel.SendMessage("Invalid command. Please type \"!bot help\" for a list of valid commands.");
+                    break;
+
+                case Commands.git:
+                case Commands.github:
+                    if (parameters.Length > 0)
+                    {
+                        List<DiscordUser> whoIsUsers;
+
+                        if (!me)
+                            whoIsUsers = GetMatchingUsers(parameters);
+                        else
+                            whoIsUsers = GetMatchingUsers(e.Message.User.Name.ToLower());
+
+                        if (whoIsUsers.Count > 0)
+                        {
+                            string githubUsername = whoIsUsers[0].Name.Substring(0, whoIsUsers[0].Name.IndexOf("#"));
+                            await e.Channel.SendMessage(githubUsername + "'s GitHub link is: " + whoIsUsers[0].GitHub);
+                        }
+                        else
+                            await e.Channel.SendMessage("I don't know that user.");
+                    }
+                    else
+                        await e.Channel.SendMessage("Please name someone whose GitHub I should link.");
+                    break;
+
+                case Commands.proj:
+                case Commands.project:
+                    if (parameters.Length > 0)
+                    {
+                        List<DiscordUser> projectUsers;
+
+                        if (!me)
+                            projectUsers = GetMatchingUsers(parameters);
+                        else
+                            projectUsers = GetMatchingUsers(e.Message.User.Name.ToLower());
+
+                        if (projectUsers.Count > 0)
+                        {
+                            string projUsername = projectUsers[0].Name.Substring(0, projectUsers[0].Name.IndexOf("#"));
+                            await e.Channel.SendMessage(projUsername + "'s current project is: " + projectUsers[0].Project);
+                        }
+                        else
+                            await e.Channel.SendMessage("I don't know that user.");
+                    }
+                    else
+                        await e.Channel.SendMessage("Please name someone whose current project I should tell you.");
+                    break;
+
+                case Commands.briahna:
+                    await e.Channel.SendFile(briahna[GenerateRandomNumber(0, briahna.Count())]);
+                    break;
+
+                case Commands.briahnansfw:
+                    await e.Channel.SendFile(briahnansfw[GenerateRandomNumber(0, briahnansfw.Count())]);
+                    break;
+
+                case Commands.setproj:
+                case Commands.setproject:
+                    if (await SetProject(e.Message.User, parameters))
+                        await e.Channel.SendMessage("Project set successful.");
+                    else
+                        await e.Channel.SendMessage("Failure! Project set not successful.");
+                    break;
+
+                case Commands.setgit:
+                case Commands.setgithub:
+                    if (await SetGitHub(e.Message.User, parameters))
+                        await e.Channel.SendMessage("GitHub set successful.");
+                    else
+                        await e.Channel.SendMessage("Failure! GitHub set not successful.");
+                    break;
+
+                case Commands.sayhi:
+                    if (parameters.Length > 0)
+                    {
+                        List<DiscordUser> sayHiUsers;
+                        if (!me)
+                        {
+                            sayHiUsers = GetMatchingUsers(parameters);
+
+                            if (sayHiUsers.Count > 0)
+                            {
+                                string pingUsername = sayHiUsers[0].Name.Substring(0, sayHiUsers[0].Name.IndexOf("#"));
+                                foreach (User user in e.Channel.Users)
+                                {
+                                    if (pingUsername.ToLower() == user.Name.ToLower())
+                                    {
+                                        await e.Channel.SendMessage("Hi, " + user.NicknameMention + ".");
+                                        break;
+                                    }
+                                }
+                            }
+                            else
+                                await e.Channel.SendMessage("Hi.");
+                        }
+                        else
+                            await e.Channel.SendMessage("Hi, " + e.Message.User.NicknameMention + ".");
+                    }
+                    else
+                        await e.Channel.SendMessage("Hi.");
+                    break;
+            }
+            return true;
+        }
+
         public async Task Start()
         {
             await LoadAll();
@@ -294,136 +528,7 @@ namespace DiscordBot
 
                         Commands currentCommand;
                         if (Enum.TryParse(command, out currentCommand))
-                        {
-                            switch (currentCommand)
-                            {
-                                case Commands.roll:
-                                    await e.Channel.SendMessage(DiceGame(e.Message.User.Name, parameters));
-                                    break;
-
-                                case Commands.help:
-                                    await e.Channel.SendMessage(Help());
-                                    break;
-
-                                case Commands.dox:
-                                case Commands.whois:
-                                    if (parameters.Length > 0)
-                                    {
-                                        List<DiscordUser> whoIsUsers = GetMatchingUsers(parameters);
-                                        if (whoIsUsers.Count > 0)
-                                            await e.Channel.SendMessage(whoIsUsers[0].Description);
-                                        else
-                                            await e.Channel.SendMessage("I don't know that user.");
-                                    }
-                                    else
-                                        await e.Channel.SendMessage("Please name someone I should dox.");
-                                    break;
-
-                                case Commands.whoareyou:
-                                    await e.Channel.SendMessage("I'm a bot; bleep, bloop. I was created by the real PFthroaway.");
-                                    break;
-
-                                case Commands.shutdown:
-                                    if (e.Message.User.Name.ToLower() == "pfthroaway")
-                                        await _client.Disconnect();
-                                    else
-                                        await e.Channel.SendMessage("You're not the boss of me!");
-                                    break;
-
-                                case Commands.ping:
-                                    if (parameters.Length > 0)
-                                    {
-                                        bool success = false;
-
-                                        List<DiscordUser> pingUsers = GetMatchingUsers(parameters);
-                                        if (pingUsers.Count > 0)
-                                        {
-                                            string pingUsername = pingUsers[0].Name.Substring(0, pingUsers[0].Name.IndexOf("#"));
-                                            foreach (User user in e.Channel.Users)
-                                            {
-                                                if (pingUsername.ToLower() == user.Name.ToLower())
-                                                {
-                                                    await e.Channel.SendMessage(user.NicknameMention);
-                                                    success = true;
-                                                    break;
-                                                }
-                                            }
-                                        }
-
-                                        if (!success)
-                                            await e.Channel.SendMessage("I don't know that user.");
-                                    }
-                                    else
-                                        await e.Channel.SendMessage("Please name someone I should ping.");
-                                    break;
-
-                                case Commands.time:
-                                    await e.Channel.SendMessage("The date and time in UTC is: " + DateTime.UtcNow.ToString("dddd, yyyy/MM/dd hh:mm:ss tt") + nl + nl + "My creator's local time is: " + DateTime.Now.ToString("dddd, yyyy/MM/dd hh:mm:ss tt"));
-                                    break;
-
-                                case Commands.whoami:
-                                    List<DiscordUser> whoAmIUsers = GetMatchingUsers(e.Message.User.Name.ToLower());
-                                    if (whoAmIUsers.Count > 0)
-                                        await e.Channel.SendMessage(whoAmIUsers[0].Description);
-                                    else
-                                        await e.Channel.SendMessage("I don't know you.");
-                                    break;
-
-                                default:
-                                    await e.Channel.SendMessage("Invalid command. Please type \"!bot help\" for a list of valid commands.");
-                                    break;
-
-                                case Commands.git:
-                                case Commands.github:
-                                    if (parameters.Length > 0)
-                                    {
-                                        List<DiscordUser> whoIsUsers = GetMatchingUsers(parameters);
-                                        if (whoIsUsers.Count > 0)
-                                        {
-                                            string githubUsername = whoIsUsers[0].Name.Substring(0, whoIsUsers[0].Name.IndexOf("#"));
-                                            await e.Channel.SendMessage(githubUsername + "'s GitHub link is: " + whoIsUsers[0].GitHub);
-                                        }
-                                        else
-                                            await e.Channel.SendMessage("I don't know that user.");
-                                    }
-                                    else
-                                        await e.Channel.SendMessage("Please name someone whose GitHub I should link.");
-                                    break;
-
-                                case Commands.proj:
-                                case Commands.project:
-                                    if (parameters.Length > 0)
-                                    {
-                                        List<DiscordUser> whoIsUsers = GetMatchingUsers(parameters);
-                                        if (whoIsUsers.Count > 0)
-                                        {
-                                            string projUsername = whoIsUsers[0].Name.Substring(0, whoIsUsers[0].Name.IndexOf("#"));
-                                            await e.Channel.SendMessage(projUsername + "'s current project is: " + whoIsUsers[0].Project);
-                                        }
-                                        else
-                                            await e.Channel.SendMessage("I don't know that user.");
-                                    }
-                                    else
-                                        await e.Channel.SendMessage("Please name someone whose current project I should tell you.");
-                                    break;
-
-                                case Commands.briahna:
-                                    await e.Channel.SendFile(briahna[GenerateRandomNumber(0, briahna.Count())]);
-                                    break;
-
-                                case Commands.briahnansfw:
-                                    await e.Channel.SendFile(briahnansfw[GenerateRandomNumber(0, briahnansfw.Count())]);
-                                    break;
-
-                                case Commands.setproj:
-                                case Commands.setproject:
-                                    if (await SetProject(e.Message.User, parameters))
-                                        await e.Channel.SendMessage("Project set successful.");
-                                    else
-                                        await e.Channel.SendMessage("Failure! Project set not successful.");
-                                    break;
-                            }
-                        }
+                            await IssueCommand(e, currentCommand, parameters);
                         else
                             await e.Channel.SendMessage("Invalid command. Please type \"!bot help\" for a list of valid commands.");
                     }
