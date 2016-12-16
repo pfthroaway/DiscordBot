@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace DiscordBot
+﻿namespace DiscordBot
 {
     /// <summary>Represents a command issued to the bot.</summary>
     internal class Command

@@ -1,4 +1,4 @@
 ﻿namespace DiscordBot
 {
-    public enum Commands { roll, help, mention, ping, dox, whois, whoareyou, shutdown, time, whoami, git, github, proj, project, briahna, briahnansfw, setproj, setproject, setgit, setgithub, sayhi }
+    public enum Commands { briahna, briahnansfw, dox, git, help, mention, molly, github, ping, proj, project, roll, sayhi, setgit, setgithub, setproj, setproject, shutdown, time, whoami, whoareyou, whois, woo }
 }

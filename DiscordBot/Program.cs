@@ -1,12 +1,10 @@
 ﻿using Discord;
-using DiscordBot;
 using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SQLite;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace DiscordBot
@@ -20,8 +18,7 @@ namespace DiscordBot
         private List<Command> AllCommands = new List<Command>();
         private List<DiscordUser> AllUsers = new List<DiscordUser>();
         private string _botToken = "";
-        private string[] briahna;
-        private string[] briahnansfw;
+        private string[] briahna, briahnansfw, molly, woo;
 
         #region Random Number Generation
 
@@ -68,6 +65,7 @@ namespace DiscordBot
 
         private async Task<bool> LoadAll()
         {
+            Console.Title = "Discord Bot";
             bool success = false;
             await Task.Factory.StartNew(() =>
             {
@@ -124,8 +122,10 @@ namespace DiscordBot
                     }
                     AllCommands = AllCommands.OrderBy(command => command.Name.ToString()).ToList();
 
-                    briahna = Directory.GetFiles("Images", "*.*");
-                    briahnansfw = Directory.GetFiles("Images\\NSFW", "*.*");
+                    briahna = Directory.GetFiles("Briahna", "*.*");
+                    briahnansfw = Directory.GetFiles("Briahna\\NSFW", "*.*");
+                    molly = Directory.GetFiles("Molly", "*.*");
+                    woo = Directory.GetFiles("Woo", "*.*");
                     success = true;
                 }
                 catch (Exception ex)
@@ -308,12 +308,12 @@ namespace DiscordBot
 
             switch (selectedCommand)
             {
-                case Commands.roll:
-                    await e.Channel.SendMessage(DiceGame(e.Message.User.Name, parameters));
+                case Commands.briahna:
+                    await e.Channel.SendFile(briahna[GenerateRandomNumber(0, briahna.Count() - 1)]);
                     break;
 
-                case Commands.help:
-                    await e.Channel.SendMessage(Help());
+                case Commands.briahnansfw:
+                    await e.Channel.SendFile(briahnansfw[GenerateRandomNumber(0, briahnansfw.Count() - 1)]);
                     break;
 
                 case Commands.dox:
@@ -335,15 +335,31 @@ namespace DiscordBot
                         await e.Channel.SendMessage("Please name someone I should dox.");
                     break;
 
-                case Commands.whoareyou:
-                    await e.Channel.SendMessage("I'm a bot; bleep, bloop. I was created by the real PFthroaway.");
+                case Commands.help:
+                    await e.Channel.SendMessage(Help());
                     break;
 
-                case Commands.shutdown:
-                    if (e.Message.User.Name.ToLower() == "pfthroaway")
-                        await _client.Disconnect();
+                case Commands.git:
+                case Commands.github:
+                    if (parameters.Length > 0)
+                    {
+                        List<DiscordUser> whoIsUsers;
+
+                        if (!me)
+                            whoIsUsers = GetMatchingUsers(parameters);
+                        else
+                            whoIsUsers = GetMatchingUsers(e.Message.User.Name.ToLower());
+
+                        if (whoIsUsers.Count > 0)
+                        {
+                            string githubUsername = whoIsUsers[0].Name.Substring(0, whoIsUsers[0].Name.IndexOf("#"));
+                            await e.Channel.SendMessage(githubUsername + "'s GitHub link is: " + whoIsUsers[0].GitHub);
+                        }
+                        else
+                            await e.Channel.SendMessage("I don't know that user.");
+                    }
                     else
-                        await e.Channel.SendMessage("You're not the boss of me!");
+                        await e.Channel.SendMessage("Please name someone whose GitHub I should link.");
                     break;
 
                 case Commands.mention:
@@ -382,45 +398,6 @@ namespace DiscordBot
                         await e.Channel.SendMessage("Please name someone I should ping.");
                     break;
 
-                case Commands.time:
-                    await e.Channel.SendMessage("The date and time in UTC is: " + DateTime.UtcNow.ToString("dddd, yyyy/MM/dd hh:mm:ss tt") + nl + nl + "My creator's local time is: " + DateTime.Now.ToString("dddd, yyyy/MM/dd hh:mm:ss tt"));
-                    break;
-
-                case Commands.whoami:
-                    List<DiscordUser> whoAmIUsers = GetMatchingUsers(e.Message.User.Name.ToLower());
-                    if (whoAmIUsers.Count > 0)
-                        await e.Channel.SendMessage(whoAmIUsers[0].Description);
-                    else
-                        await e.Channel.SendMessage("I don't know you.");
-                    break;
-
-                default:
-                    await e.Channel.SendMessage("Invalid command. Please type \"!bot help\" for a list of valid commands.");
-                    break;
-
-                case Commands.git:
-                case Commands.github:
-                    if (parameters.Length > 0)
-                    {
-                        List<DiscordUser> whoIsUsers;
-
-                        if (!me)
-                            whoIsUsers = GetMatchingUsers(parameters);
-                        else
-                            whoIsUsers = GetMatchingUsers(e.Message.User.Name.ToLower());
-
-                        if (whoIsUsers.Count > 0)
-                        {
-                            string githubUsername = whoIsUsers[0].Name.Substring(0, whoIsUsers[0].Name.IndexOf("#"));
-                            await e.Channel.SendMessage(githubUsername + "'s GitHub link is: " + whoIsUsers[0].GitHub);
-                        }
-                        else
-                            await e.Channel.SendMessage("I don't know that user.");
-                    }
-                    else
-                        await e.Channel.SendMessage("Please name someone whose GitHub I should link.");
-                    break;
-
                 case Commands.proj:
                 case Commands.project:
                     if (parameters.Length > 0)
@@ -444,28 +421,12 @@ namespace DiscordBot
                         await e.Channel.SendMessage("Please name someone whose current project I should tell you.");
                     break;
 
-                case Commands.briahna:
-                    await e.Channel.SendFile(briahna[GenerateRandomNumber(0, briahna.Count())]);
+                case Commands.molly:
+                    await e.Channel.SendFile(molly[GenerateRandomNumber(0, molly.Count() - 1)]);
                     break;
 
-                case Commands.briahnansfw:
-                    await e.Channel.SendFile(briahnansfw[GenerateRandomNumber(0, briahnansfw.Count())]);
-                    break;
-
-                case Commands.setproj:
-                case Commands.setproject:
-                    if (await SetProject(e.Message.User, parameters))
-                        await e.Channel.SendMessage("Project set successful.");
-                    else
-                        await e.Channel.SendMessage("Failure! Project set not successful.");
-                    break;
-
-                case Commands.setgit:
-                case Commands.setgithub:
-                    if (await SetGitHub(e.Message.User, parameters))
-                        await e.Channel.SendMessage("GitHub set successful.");
-                    else
-                        await e.Channel.SendMessage("Failure! GitHub set not successful.");
+                case Commands.roll:
+                    await e.Channel.SendMessage(DiceGame(e.Message.User.Name, parameters));
                     break;
 
                 case Commands.sayhi:
@@ -497,6 +458,53 @@ namespace DiscordBot
                     else
                         await e.Channel.SendMessage("Hi.");
                     break;
+
+                case Commands.setgit:
+                case Commands.setgithub:
+                    if (await SetGitHub(e.Message.User, parameters))
+                        await e.Channel.SendMessage("GitHub set successful.");
+                    else
+                        await e.Channel.SendMessage("Failure! GitHub set not successful.");
+                    break;
+
+                case Commands.setproj:
+                case Commands.setproject:
+                    if (await SetProject(e.Message.User, parameters))
+                        await e.Channel.SendMessage("Project set successful.");
+                    else
+                        await e.Channel.SendMessage("Failure! Project set not successful.");
+                    break;
+
+                case Commands.shutdown:
+                    if (e.Message.User.Name.ToLower() == "pfthroaway")
+                        await _client.Disconnect();
+                    else
+                        await e.Channel.SendMessage("You're not the boss of me!");
+                    break;
+
+                case Commands.time:
+                    await e.Channel.SendMessage("The date and time in UTC is: " + DateTime.UtcNow.ToString("dddd, yyyy/MM/dd hh:mm:ss tt") + nl + nl + "My creator's local time is: " + DateTime.Now.ToString("dddd, yyyy/MM/dd hh:mm:ss tt"));
+                    break;
+
+                case Commands.whoami:
+                    List<DiscordUser> whoAmIUsers = GetMatchingUsers(e.Message.User.Name.ToLower());
+                    if (whoAmIUsers.Count > 0)
+                        await e.Channel.SendMessage(whoAmIUsers[0].Description);
+                    else
+                        await e.Channel.SendMessage("I don't know you.");
+                    break;
+
+                default:
+                    await e.Channel.SendMessage("Invalid command. Please type \"!bot help\" for a list of valid commands.");
+                    break;
+
+                case Commands.whoareyou:
+                    await e.Channel.SendMessage("I'm a bot; bleep, bloop. I was created by the real PFthroaway.");
+                    break;
+
+                case Commands.woo:
+                    await e.Channel.SendFile(woo[GenerateRandomNumber(0, woo.Count() - 1)]);
+                    break;
             }
             return true;
         }
@@ -510,7 +518,7 @@ namespace DiscordBot
 
                 _client.MessageReceived += async (s, e) =>
                 {
-                    if (e.Message.Text.Trim().ToLower().StartsWith("!bot"))
+                    if (e.Message.Text.Trim().ToLower().StartsWith("!bot") && !e.Message.Text.Trim().ToLower().Contains("woo"))
                     {
                         string message = e.Message.Text.Substring(e.Message.Text.IndexOf("!bot") + 4).Trim();
                         string command = "";
@@ -518,7 +526,7 @@ namespace DiscordBot
                         if (message.Contains(" "))
                         {
                             command = message.Substring(0, message.IndexOf(" ")).ToLower();
-                            if (!command.Contains("setproj"))
+                            if (!command.Contains("setproj") && !command.Contains("setgit"))
                                 parameters = message.Substring(message.IndexOf(" ") + 1).ToLower();
                             else
                                 parameters = message.Substring(message.IndexOf(" ") + 1);
@@ -531,6 +539,10 @@ namespace DiscordBot
                             await IssueCommand(e, currentCommand, parameters);
                         else
                             await e.Channel.SendMessage("Invalid command. Please type \"!bot help\" for a list of valid commands.");
+                    }
+                    else if (e.Message.Text.Trim().ToLower().Contains("woo"))
+                    {
+                        await IssueCommand(e, Commands.woo, "");
                     }
                 };
 
