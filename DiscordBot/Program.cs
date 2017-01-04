@@ -6,73 +6,36 @@ using System.Data.SQLite;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Extensions;
 
 namespace DiscordBot
 {
     internal class Program : IDisposable
     {
+        // ReSharper disable once InconsistentNaming
         private const string _DBPROVIDERANDSOURCE = "Data Source = DiscordBot.sqlite;Version=3";
 
-        private string nl = Environment.NewLine;
         private DiscordClient _client;
-        private List<Command> AllCommands = new List<Command>();
-        private List<DiscordUser> AllUsers = new List<DiscordUser>();
+        private List<Command> _allCommands = new List<Command>();
+        private List<DiscordUser> _allUsers = new List<DiscordUser>();
         private string _botToken = "";
-        private string[] briahna, briahnansfw, molly, woo;
-
-        #region Random Number Generation
-
-        /// <summary>
-        /// Generates a random number between min and max (inclusive).
-        /// </summary>
-        /// <param name="min">Inclusive minimum number</param>
-        /// <param name="max">Inclusive maximum number</param>
-        /// <returns>Returns randomly generated integer between min and max.</returns>
-        internal static int GenerateRandomNumber(int min, int max)
-        {
-            return GenerateRandomNumber(min, max, int.MinValue, int.MaxValue);
-        }
-
-        /// <summary>
-        /// Generates a random number between min and max (inclusive).
-        /// </summary>
-        /// <param name="min">Inclusive minimum number</param>
-        /// <param name="max">Inclusive maximum number</param>
-        /// <param name="upperLimit">Maximum limit for the method, regardless of min and max.</param>
-        /// <returns>Returns randomly generated integer between min and max with an upper limit of upperLimit.</returns>
-        internal static int GenerateRandomNumber(int min, int max, int lowerLimit, int upperLimit)
-        {
-            int result;
-
-            if (min < max)
-                result = ThreadSafeRandom.ThisThreadsRandom.Next(min, max + 1);
-            else
-                result = ThreadSafeRandom.ThisThreadsRandom.Next(max, min + 1);
-
-            if (result < lowerLimit)
-                return lowerLimit;
-            if (result > upperLimit)
-                return upperLimit;
-
-            return result;
-        }
-
-        #endregion Random Number Generation
+        private string[] _briahna, _briahnansfw, _molly, _woo;
 
         private static void Main(string[] args) => new Program().Start().Wait();
 
         #region Load
 
+        /// <summary>Loads everything from the database and from disk.</summary>
+        /// <returns>Returns true if completed successfully</returns>
         private async Task<bool> LoadAll()
         {
             Console.Title = "Discord Bot";
             bool success = false;
             await Task.Factory.StartNew(() =>
             {
-                SQLiteConnection con = new SQLiteConnection();
+                SQLiteConnection con = new SQLiteConnection { ConnectionString = _DBPROVIDERANDSOURCE };
                 SQLiteDataAdapter da = new SQLiteDataAdapter("SELECT * FROM BotToken", con);
                 DataSet ds = new DataSet();
-                con.ConnectionString = _DBPROVIDERANDSOURCE;
 
                 try
                 {
@@ -89,9 +52,8 @@ namespace DiscordBot
                     {
                         for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
                         {
-                            List<string> nicknames = new List<string>();
                             string nick = ds.Tables[0].Rows[i]["Nicknames"].ToString();
-                            nicknames = nick.Split(',').Select(p => p.ToLower().Trim()).ToList();
+                            List<string> nicknames = nick.Split(',').Select(p => p.ToLower().Trim()).ToList();
 
                             DiscordUser newUser = new DiscordUser(
                                 name: ds.Tables[0].Rows[i]["Name"].ToString(),
@@ -99,10 +61,10 @@ namespace DiscordBot
                                 github: ds.Tables[0].Rows[i]["GitHub"].ToString(),
                                 project: ds.Tables[0].Rows[i]["Project"].ToString(),
                                 nicknames: nicknames);
-                            AllUsers.Add(newUser);
+                            _allUsers.Add(newUser);
                         }
                     }
-                    AllUsers = AllUsers.OrderBy(user => user.Name).ToList();
+                    _allUsers = _allUsers.OrderBy(user => user.Name).ToList();
 
                     ds = new DataSet();
                     da = new SQLiteDataAdapter("SELECT * FROM Commands", con);
@@ -117,15 +79,15 @@ namespace DiscordBot
                             Command newCommand = new Command(
                                 name: newCommandName,
                                 description: ds.Tables[0].Rows[i]["Description"].ToString());
-                            AllCommands.Add(newCommand);
+                            _allCommands.Add(newCommand);
                         }
                     }
-                    AllCommands = AllCommands.OrderBy(command => command.Name.ToString()).ToList();
+                    _allCommands = _allCommands.OrderBy(command => command.Name.ToString()).ToList();
 
-                    briahna = Directory.GetFiles("Briahna", "*.*");
-                    briahnansfw = Directory.GetFiles("Briahna\\NSFW", "*.*");
-                    molly = Directory.GetFiles("Molly", "*.*");
-                    woo = Directory.GetFiles("Woo", "*.*");
+                    _briahna = Directory.GetFiles("Briahna", "*.*");
+                    _briahnansfw = Directory.GetFiles("Briahna\\NSFW", "*.*");
+                    _molly = Directory.GetFiles("Molly", "*.*");
+                    _woo = Directory.GetFiles("Woo", "*.*");
                     success = true;
                 }
                 catch (Exception ex)
@@ -142,22 +104,18 @@ namespace DiscordBot
         #region Dice Game
 
         /// <summary>Plays a game of dice using the #d# system.</summary>
-        /// <param name="e">MessageEventArgs</param>
+        /// <param name="username">Username of player roller dice</param>
         /// <param name="rolledDice">Dice command</param>
         /// <returns>True if successful</returns>
-        private string DiceGame(string username, string rolledDice)
+        private static string DiceGame(string username, string rolledDice)
         {
-            string[] dice = new string[2];
-            int sidesOnDice = 0;
-            int numberOfDice = 0;
-
             if (rolledDice.Length > 0)
             {
-                dice = rolledDice.Split('d', 'D');
-                if (dice.Count() == 2)
+                string[] dice = rolledDice.Split('d', 'D');
+                if (dice.Length == 2)
                 {
-                    numberOfDice = Int32Helper.Parse(dice[0]);
-                    sidesOnDice = Int32Helper.Parse(dice[1]);
+                    int numberOfDice = Int32Helper.Parse(dice[0]);
+                    int sidesOnDice = Int32Helper.Parse(dice[1]);
 
                     try
                     {
@@ -168,12 +126,10 @@ namespace DiscordBot
 
                             if (numberOfDice <= 0 || sidesOnDice <= 0)
                                 return "Please enter a valid dice roll. (e.g. 2d10)";
-                            else
-                            {
-                                string output = username + " rolls";
-                                output += RollDice(numberOfDice, sidesOnDice);
-                                return output;
-                            }
+
+                            string output = username + " rolls";
+                            output += RollDice(numberOfDice, sidesOnDice);
+                            return output;
                         }
                     }
                     catch (Exception)
@@ -191,25 +147,18 @@ namespace DiscordBot
         /// <param name="numberOfDice">Number of dice to be rolled</param>
         /// <param name="sidesOnDice">Number of sides on each die</param>
         /// <returns>Returns result string</returns>
-        private string RollDice(int numberOfDice, int sidesOnDice)
+        private static string RollDice(int numberOfDice, int sidesOnDice)
         {
-            string output = "";
-
             int[] values = new int[numberOfDice];
-            int totalValue = 0;
 
             for (int i = 0; i < numberOfDice; i++)
-            {
-                values[i] = GenerateRandomNumber(1, sidesOnDice);
-                totalValue += values[i];
-            }
+                values[i] = Functions.GenerateRandomNumber(1, sidesOnDice);
 
-            if (numberOfDice >= 30 || sidesOnDice >= 30)
-                output = " " + numberOfDice + "d" + sidesOnDice + ".";
-            else
-                output = ": " + string.Join(", ", values);
+            string output = numberOfDice >= 30 || sidesOnDice >= 30
+                ? " " + numberOfDice + "d" + sidesOnDice + "."
+                : ": " + string.Join(", ", values);
 
-            return output += nl + nl + "Total Value: " + values.Sum().ToString("N0");
+            return output + ("\n\nTotal Value: " + values.Sum().ToString("N0"));
         }
 
         #endregion Dice Game
@@ -221,17 +170,23 @@ namespace DiscordBot
         {
             if (username.Contains("@"))
                 username = username.Substring(username.IndexOf("@") + 1);
-            return AllUsers.Where(user => user.Nicknames.Contains(username)).ToList();
+            return _allUsers.Where(user => user.Nicknames.Contains(username)).ToList();
         }
 
+        /// <summary>Displays all commands in the database.</summary>
+        /// <returns>Return text regarding all commands in the database.</returns>
         private string Help()
         {
-            string output = "These are all the commands I can do: " + nl + nl;
-            for (int i = 0; i < AllCommands.Count; i++)
-                output += AllCommands[i].NameAndDescription + nl + nl;
+            string output = "These are all the commands I can do: \n\n";
+            foreach (Command command in _allCommands)
+                output += command.NameAndDescription + "\n\n";
             return output;
         }
 
+        /// <summary>Allows the caller to change their current project in the database.</summary>
+        /// <param name="user">User whose project wants to be changed</param>
+        /// <param name="project">New project</param>
+        /// <returns>Returns true if database set successful</returns>
         private async Task<bool> SetProject(User user, string project)
         {
             bool success = false;
@@ -242,8 +197,7 @@ namespace DiscordBot
             {
                 matchingUsers[0].Project = project;
                 SQLiteCommand cmd = new SQLiteCommand();
-                SQLiteConnection con = new SQLiteConnection();
-                con.ConnectionString = _DBPROVIDERANDSOURCE;
+                SQLiteConnection con = new SQLiteConnection { ConnectionString = _DBPROVIDERANDSOURCE };
                 cmd.CommandText = "UPDATE Users SET [Project] = @project WHERE [Name] = @name";
                 cmd.Parameters.AddWithValue("@project", project);
                 cmd.Parameters.AddWithValue("@name", user.ToString());
@@ -267,6 +221,10 @@ namespace DiscordBot
             return success;
         }
 
+        /// <summary>Allows the caller to change their current GitHub link in the database.</summary>
+        /// <param name="user">User whose GitHub link wants to be changed</param>
+        /// <param name="github">New GitHub link</param>
+        /// <returns>Returns true if database set successful</returns>
         private async Task<bool> SetGitHub(User user, string github)
         {
             bool success = false;
@@ -277,8 +235,7 @@ namespace DiscordBot
             {
                 matchingUsers[0].GitHub = github;
                 SQLiteCommand cmd = new SQLiteCommand();
-                SQLiteConnection con = new SQLiteConnection();
-                con.ConnectionString = _DBPROVIDERANDSOURCE;
+                SQLiteConnection con = new SQLiteConnection { ConnectionString = _DBPROVIDERANDSOURCE };
                 cmd.CommandText = "UPDATE Users SET [GitHub] = @github WHERE [Name] = @name";
                 cmd.Parameters.AddWithValue("@github", github);
                 cmd.Parameters.AddWithValue("@name", user.ToString());
@@ -302,6 +259,11 @@ namespace DiscordBot
             return success;
         }
 
+        /// <summary>Allows the caller to issue a command to the bot.</summary>
+        /// <param name="e">Information about the original message</param>
+        /// <param name="selectedCommand">Command to be issued</param>
+        /// <param name="parameters">Parameters regarding command</param>
+        /// <returns>Returns true if command is successful.</returns>
         private async Task<bool> IssueCommand(MessageEventArgs e, Commands selectedCommand, string parameters)
         {
             bool me = parameters == "me";
@@ -309,22 +271,18 @@ namespace DiscordBot
             switch (selectedCommand)
             {
                 case Commands.briahna:
-                    await e.Channel.SendFile(briahna[GenerateRandomNumber(0, briahna.Count() - 1)]);
+                    await e.Channel.SendFile(_briahna[Functions.GenerateRandomNumber(0, _briahna.Length - 1)]);
                     break;
 
                 case Commands.briahnansfw:
-                    await e.Channel.SendFile(briahnansfw[GenerateRandomNumber(0, briahnansfw.Count() - 1)]);
+                    await e.Channel.SendFile(_briahnansfw[Functions.GenerateRandomNumber(0, _briahnansfw.Length - 1)]);
                     break;
 
                 case Commands.dox:
                 case Commands.whois:
                     if (parameters.Length > 0)
                     {
-                        List<DiscordUser> whoIsUsers;
-                        if (!me)
-                            whoIsUsers = GetMatchingUsers(parameters);
-                        else
-                            whoIsUsers = GetMatchingUsers(e.Message.User.Name.ToLower());
+                        List<DiscordUser> whoIsUsers = GetMatchingUsers(!me ? parameters : e.Message.User.Name.ToLower());
 
                         if (whoIsUsers.Count > 0)
                             await e.Channel.SendMessage(whoIsUsers[0].Description);
@@ -343,17 +301,12 @@ namespace DiscordBot
                 case Commands.github:
                     if (parameters.Length > 0)
                     {
-                        List<DiscordUser> whoIsUsers;
+                        List<DiscordUser> gitHubUsers = GetMatchingUsers(!me ? parameters : e.Message.User.Name.ToLower());
 
-                        if (!me)
-                            whoIsUsers = GetMatchingUsers(parameters);
-                        else
-                            whoIsUsers = GetMatchingUsers(e.Message.User.Name.ToLower());
-
-                        if (whoIsUsers.Count > 0)
+                        if (gitHubUsers.Count > 0)
                         {
-                            string githubUsername = whoIsUsers[0].Name.Substring(0, whoIsUsers[0].Name.IndexOf("#"));
-                            await e.Channel.SendMessage(githubUsername + "'s GitHub link is: " + whoIsUsers[0].GitHub);
+                            string githubUsername = gitHubUsers[0].Name.Substring(0, gitHubUsers[0].Name.IndexOf("#"));
+                            await e.Channel.SendMessage(githubUsername + "'s GitHub link is: " + gitHubUsers[0].GitHub);
                         }
                         else
                             await e.Channel.SendMessage("I don't know that user.");
@@ -402,12 +355,7 @@ namespace DiscordBot
                 case Commands.project:
                     if (parameters.Length > 0)
                     {
-                        List<DiscordUser> projectUsers;
-
-                        if (!me)
-                            projectUsers = GetMatchingUsers(parameters);
-                        else
-                            projectUsers = GetMatchingUsers(e.Message.User.Name.ToLower());
+                        List<DiscordUser> projectUsers = GetMatchingUsers(!me ? parameters : e.Message.User.Name.ToLower());
 
                         if (projectUsers.Count > 0)
                         {
@@ -422,7 +370,7 @@ namespace DiscordBot
                     break;
 
                 case Commands.molly:
-                    await e.Channel.SendFile(molly[GenerateRandomNumber(0, molly.Count() - 1)]);
+                    await e.Channel.SendFile(_molly[Functions.GenerateRandomNumber(0, _molly.Length - 1)]);
                     break;
 
                 case Commands.roll:
@@ -432,10 +380,9 @@ namespace DiscordBot
                 case Commands.sayhi:
                     if (parameters.Length > 0)
                     {
-                        List<DiscordUser> sayHiUsers;
                         if (!me)
                         {
-                            sayHiUsers = GetMatchingUsers(parameters);
+                            List<DiscordUser> sayHiUsers = GetMatchingUsers(parameters);
 
                             if (sayHiUsers.Count > 0)
                             {
@@ -483,7 +430,7 @@ namespace DiscordBot
                     break;
 
                 case Commands.time:
-                    await e.Channel.SendMessage("The date and time in UTC is: " + DateTime.UtcNow.ToString("dddd, yyyy/MM/dd hh:mm:ss tt") + nl + nl + "My creator's local time is: " + DateTime.Now.ToString("dddd, yyyy/MM/dd hh:mm:ss tt"));
+                    await e.Channel.SendMessage("The date and time in UTC is: " + DateTime.UtcNow.ToString("dddd, yyyy/MM/dd hh:mm:ss tt") + "\n\nMy creator's local time is: " + DateTime.Now.ToString("dddd, yyyy/MM/dd hh:mm:ss tt"));
                     break;
 
                 case Commands.whoami:
@@ -503,13 +450,15 @@ namespace DiscordBot
                     break;
 
                 case Commands.woo:
-                    await e.Channel.SendFile(woo[GenerateRandomNumber(0, woo.Count() - 1)]);
+                    await e.Channel.SendFile(_woo[Functions.GenerateRandomNumber(0, _woo.Length - 1)]);
                     break;
             }
             return true;
         }
 
-        public async Task Start()
+        /// <summary>Starts the Discord bot.</summary>
+        /// <returns>Returns Task</returns>
+        private async Task Start()
         {
             await LoadAll();
             if (_botToken.Length > 0)
@@ -518,10 +467,10 @@ namespace DiscordBot
 
                 _client.MessageReceived += async (s, e) =>
                 {
-                    if (e.Message.Text.Trim().ToLower().StartsWith("!bot") && !e.Message.Text.Trim().ToLower().Contains("woo"))
+                    if (e.Message.Text.Trim().ToLower().StartsWith("!bot"))
                     {
-                        string message = e.Message.Text.Substring(e.Message.Text.IndexOf("!bot") + 4).Trim();
-                        string command = "";
+                        string message = e.Message.Text.Substring(e.Message.Text.ToLower().IndexOf("!bot") + 4).Trim();
+                        string command;
                         string parameters = "";
                         if (message.Contains(" "))
                         {
@@ -540,15 +489,12 @@ namespace DiscordBot
                         else
                             await e.Channel.SendMessage("Invalid command. Please type \"!bot help\" for a list of valid commands.");
                     }
-                    else if (e.Message.Text.Trim().ToLower().Contains("woo"))
-                    {
-                        await IssueCommand(e, Commands.woo, "");
-                    }
                 };
 
                 _client.ExecuteAndWait(async () =>
                 {
                     await _client.Connect(_botToken, TokenType.Bot);
+                    _client.SetGame("Type '!bot help' for help.");
                 });
             }
             else
