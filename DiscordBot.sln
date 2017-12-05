@@ -1,9 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.25420.1
+# Visual Studio 15
+VisualStudioVersion = 15.0.27004.2010
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DiscordBot", "DiscordBot\DiscordBot.csproj", "{D8627EE8-8BEF-4D54-94F5-8ECAE5DC8242}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DiscordBot", "DiscordBot\DiscordBot.csproj", "{6525209E-BEAC-4E86-AB90-D715A41FD199}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ExtensionsCore", "ExtensionsCore\ExtensionsCore.csproj", "{5F493F9A-C4D5-46A5-AF54-227300A4CC81}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -11,12 +13,19 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{D8627EE8-8BEF-4D54-94F5-8ECAE5DC8242}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{D8627EE8-8BEF-4D54-94F5-8ECAE5DC8242}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{D8627EE8-8BEF-4D54-94F5-8ECAE5DC8242}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{D8627EE8-8BEF-4D54-94F5-8ECAE5DC8242}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6525209E-BEAC-4E86-AB90-D715A41FD199}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6525209E-BEAC-4E86-AB90-D715A41FD199}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6525209E-BEAC-4E86-AB90-D715A41FD199}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6525209E-BEAC-4E86-AB90-D715A41FD199}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5F493F9A-C4D5-46A5-AF54-227300A4CC81}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5F493F9A-C4D5-46A5-AF54-227300A4CC81}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5F493F9A-C4D5-46A5-AF54-227300A4CC81}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5F493F9A-C4D5-46A5-AF54-227300A4CC81}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {AD299400-60CC-4ACC-BA52-DA4AA732772C}
 	EndGlobalSection
 EndGlobal
